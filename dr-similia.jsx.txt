@@ -1,0 +1,322 @@
+import { useState, useRef, useEffect } from "react";
+
+const SYSTEM_PROMPT = `You are Dr. Similia, an expert AI tutor specifically for BHMS (Bachelor of Homoeopathic Medicine and Surgery) students in India. 
+
+Your role:
+- Answer questions related to BHMS subjects: Organon of Medicine, Materia Medica, Homoeopathic Pharmacy, Physiology, Biochemistry, Pathology, Surgery, Obstetrics & Gynaecology
+- Always respond in Hinglish (Hindi + English mix) — simple, easy to understand for Indian medical students
+- Give exam-focused, structured answers
+- Use bullet points and numbered lists for clarity
+- Mention key terms in English but explain in Hindi
+- Always end with "Koi aur doubt? Poochho! 😊"
+
+Example style:
+"Aphorism 1 ka matlab hai ki doctor ka sabse bada kaam hai patient ko CURE karna — not just symptomatic relief. Hahnemann ne kaha ki true cure = rapid + gentle + permanent. 
+Key points:
+• Rapid = jaldi theek ho
+• Gentle = bina side effects ke  
+• Permanent = dobara na aaye"
+
+Be encouraging, friendly, and supportive like a senior student helping a junior.`;
+
+const SUGGESTED_QUESTIONS = [
+  "Aphorism 1 explain karo",
+  "Similimum kya hota hai?",
+  "Potency selection kaise karte hain?",
+  "Aconite ka keynote batao",
+  "Case taking ke steps kya hain?",
+  "Biochemistry — Krebs cycle samjhao",
+];
+
+export default function DrSimilia() {
+  const [messages, setMessages] = useState([
+    {
+      role: "assistant",
+      content: "Namaste! 🙏 Main hoon **Dr. Similia** — tumhara personal BHMS AI tutor!\n\nOrganon, Materia Medica, Pharmacy, Physiology — koi bhi doubt poochho, main Hindi mein samjhaunga.\n\nKya jaanna chahte ho aaj? 😊",
+    },
+  ]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  const sendMessage = async (text) => {
+    const question = text || input.trim();
+    if (!question || loading) return;
+    setInput("");
+
+    const newMessages = [...messages, { role: "user", content: question }];
+    setMessages(newMessages);
+    setLoading(true);
+
+    try {
+      const apiMessages = newMessages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          system: SYSTEM_PROMPT,
+          messages: apiMessages,
+        }),
+      });
+
+      const data = await res.json();
+      const reply = data.content?.[0]?.text || "Sorry, kuch error aa gaya. Dobara try karo!";
+      setMessages([...newMessages, { role: "assistant", content: reply }]);
+    } catch {
+      setMessages([...newMessages, { role: "assistant", content: "Network error! Internet check karo aur dobara try karo. 🙏" }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKey = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  const renderText = (text) => {
+    const lines = text.split("\n");
+    return lines.map((line, i) => {
+      const bold = line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+      return (
+        <p
+          key={i}
+          className={line.startsWith("•") || line.match(/^\d+\./) ? "ml-3" : ""}
+          dangerouslySetInnerHTML={{ __html: bold }}
+          style={{ marginBottom: line === "" ? "8px" : "2px" }}
+        />
+      );
+    });
+  };
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)",
+      fontFamily: "'Segoe UI', sans-serif",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      padding: "0",
+    }}>
+      {/* Header */}
+      <div style={{
+        width: "100%",
+        maxWidth: "700px",
+        background: "rgba(255,255,255,0.05)",
+        backdropFilter: "blur(20px)",
+        borderBottom: "1px solid rgba(255,255,255,0.1)",
+        padding: "16px 20px",
+        display: "flex",
+        alignItems: "center",
+        gap: "14px",
+        position: "sticky",
+        top: 0,
+        zIndex: 10,
+      }}>
+        {/* Logo */}
+        <div style={{
+          width: "48px", height: "48px",
+          borderRadius: "14px",
+          background: "linear-gradient(135deg, #00c9ff, #00ff87)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: "22px",
+          boxShadow: "0 4px 20px rgba(0,201,255,0.4)",
+          flexShrink: 0,
+        }}>⚕️</div>
+        <div>
+          <div style={{ color: "#fff", fontWeight: 700, fontSize: "18px", letterSpacing: "0.3px" }}>
+            Dr. Similia
+          </div>
+          <div style={{ color: "#00ff87", fontSize: "12px", fontWeight: 500 }}>
+            BHMS AI Tutor • Hindi Medium
+          </div>
+        </div>
+        <div style={{ marginLeft: "auto", display: "flex", gap: "6px" }}>
+          {["Organon", "MM", "Pharmacy"].map(tag => (
+            <span key={tag} style={{
+              background: "rgba(0,201,255,0.15)",
+              border: "1px solid rgba(0,201,255,0.3)",
+              color: "#00c9ff",
+              borderRadius: "20px",
+              padding: "3px 10px",
+              fontSize: "11px",
+              fontWeight: 600,
+            }}>{tag}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* Chat Area */}
+      <div style={{
+        width: "100%",
+        maxWidth: "700px",
+        flex: 1,
+        overflowY: "auto",
+        padding: "20px 16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "16px",
+        minHeight: "calc(100vh - 200px)",
+      }}>
+        {messages.map((msg, i) => (
+          <div key={i} style={{
+            display: "flex",
+            justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+            alignItems: "flex-end",
+            gap: "10px",
+          }}>
+            {msg.role === "assistant" && (
+              <div style={{
+                width: "32px", height: "32px", borderRadius: "10px",
+                background: "linear-gradient(135deg, #00c9ff, #00ff87)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "16px", flexShrink: 0,
+              }}>⚕️</div>
+            )}
+            <div style={{
+              maxWidth: "80%",
+              padding: "12px 16px",
+              borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+              background: msg.role === "user"
+                ? "linear-gradient(135deg, #00c9ff, #0072ff)"
+                : "rgba(255,255,255,0.08)",
+              backdropFilter: "blur(10px)",
+              border: msg.role === "user" ? "none" : "1px solid rgba(255,255,255,0.12)",
+              color: "#fff",
+              fontSize: "14px",
+              lineHeight: "1.6",
+              boxShadow: msg.role === "user"
+                ? "0 4px 20px rgba(0,114,255,0.3)"
+                : "0 2px 10px rgba(0,0,0,0.2)",
+            }}>
+              {renderText(msg.content)}
+            </div>
+          </div>
+        ))}
+
+        {loading && (
+          <div style={{ display: "flex", alignItems: "flex-end", gap: "10px" }}>
+            <div style={{
+              width: "32px", height: "32px", borderRadius: "10px",
+              background: "linear-gradient(135deg, #00c9ff, #00ff87)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px",
+            }}>⚕️</div>
+            <div style={{
+              padding: "14px 18px",
+              borderRadius: "18px 18px 18px 4px",
+              background: "rgba(255,255,255,0.08)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              display: "flex", gap: "5px", alignItems: "center",
+            }}>
+              {[0, 1, 2].map(d => (
+                <div key={d} style={{
+                  width: "7px", height: "7px", borderRadius: "50%",
+                  background: "#00c9ff",
+                  animation: "bounce 1.2s infinite",
+                  animationDelay: `${d * 0.2}s`,
+                }} />
+              ))}
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Suggested Questions */}
+      {messages.length <= 2 && (
+        <div style={{
+          width: "100%", maxWidth: "700px",
+          padding: "0 16px 12px",
+          display: "flex", flexWrap: "wrap", gap: "8px",
+        }}>
+          {SUGGESTED_QUESTIONS.map((q) => (
+            <button key={q} onClick={() => sendMessage(q)} style={{
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              color: "#cde",
+              borderRadius: "20px",
+              padding: "6px 14px",
+              fontSize: "12px",
+              cursor: "pointer",
+              transition: "all 0.2s",
+            }}
+              onMouseEnter={e => e.target.style.background = "rgba(0,201,255,0.15)"}
+              onMouseLeave={e => e.target.style.background = "rgba(255,255,255,0.06)"}
+            >{q}</button>
+          ))}
+        </div>
+      )}
+
+      {/* Input Area */}
+      <div style={{
+        width: "100%", maxWidth: "700px",
+        padding: "12px 16px 20px",
+        background: "rgba(255,255,255,0.03)",
+        borderTop: "1px solid rgba(255,255,255,0.08)",
+      }}>
+        <div style={{
+          display: "flex", gap: "10px", alignItems: "flex-end",
+          background: "rgba(255,255,255,0.07)",
+          border: "1px solid rgba(255,255,255,0.15)",
+          borderRadius: "16px",
+          padding: "10px 14px",
+        }}>
+          <textarea
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="BHMS ka koi bhi doubt poochho... (Organon, MM, Pharmacy)"
+            rows={1}
+            style={{
+              flex: 1, background: "transparent", border: "none", outline: "none",
+              color: "#fff", fontSize: "14px", lineHeight: "1.5", resize: "none",
+              fontFamily: "inherit",
+            }}
+          />
+          <button
+            onClick={() => sendMessage()}
+            disabled={!input.trim() || loading}
+            style={{
+              width: "38px", height: "38px", borderRadius: "10px",
+              background: input.trim() && !loading
+                ? "linear-gradient(135deg, #00c9ff, #0072ff)"
+                : "rgba(255,255,255,0.1)",
+              border: "none", cursor: input.trim() && !loading ? "pointer" : "not-allowed",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "18px", transition: "all 0.2s", flexShrink: 0,
+              boxShadow: input.trim() && !loading ? "0 4px 15px rgba(0,114,255,0.4)" : "none",
+            }}>
+            ➤
+          </button>
+        </div>
+        <div style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: "11px", marginTop: "8px" }}>
+          Dr. Similia • Powered by AI • SahAI for Shiksha 2026
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes bounce {
+          0%, 60%, 100% { transform: translateY(0); }
+          30% { transform: translateY(-6px); }
+        }
+        * { box-sizing: border-box; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+      `}</style>
+    </div>
+  );
+}
